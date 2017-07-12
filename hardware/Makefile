@@ -75,7 +75,7 @@ SNAP_TMP_FILES =  $(SNAP_HARDWARE_ROOT)/sim/README.txt \
 #      due to missing dependencies between the different targets.
 #
 
-.PHONY: all clean gitclean check_snap_settings check_denali model action_hw action_sw software pslse setup_environment create_environment config patch_version patch_NVMe image cloud_image snap_config snap_config_start xsim irun questa
+.PHONY: all clean gitclean check_snap_settings check_denali model action_hw action_sw software pslse setup_environment create_environment config patch_version patch_NVMe image snap_static_region combine_dcps snap_config snap_config_start xsim irun questa
 
 all: config model image
 
@@ -134,16 +134,16 @@ setup_environment:
 	@mkdir -p $(LOGS_DIR);
 	@mkdir -p $(BUILD_DIR)/Images;
 	@mkdir -p $(BUILD_DIR)/Checkpoints;
-	@ln -f -s $(SNAP_HARDWARE_ROOT)/setup/snap_build.tcl       $(BUILD_DIR)/snap_build.tcl;
-	@ln -f -s $(SNAP_HARDWARE_ROOT)/setup/snap_cloud_build.tcl $(BUILD_DIR)/snap_cloud_build.tcl;
-	@cp -p $(PSL_DCP)                                          $(BUILD_DIR)/Checkpoints/;
+	@ln -f -s $(SNAP_HARDWARE_ROOT)/setup/snap_build.tcl         $(BUILD_DIR)/snap_build.tcl;
+	@ln -f -s $(SNAP_HARDWARE_ROOT)/setup/snap_static_region.tcl $(BUILD_DIR)/snap_static_region.tcl;
+	@cp -p $(PSL_DCP)                                            $(BUILD_DIR)/Checkpoints/;
 	@if [ $(FPGACARD) = "KU3" ]; then \
-		ln -f -s $(SNAP_HDL_CORE)/psl_fpga_ku3.vhd_source  $(SNAP_HDL_CORE)/psl_fpga.vhd_source; \
-		ln -f -s $(SNAP_HDL_CORE)/psl_accel_ku3.vhd_source $(SNAP_HDL_CORE)/psl_accel.vhd_source; \
+		ln -f -s $(SNAP_HDL_CORE)/psl_fpga_ku3.vhd_source    $(SNAP_HDL_CORE)/psl_fpga.vhd_source; \
+		ln -f -s $(SNAP_HDL_CORE)/psl_accel_ku3.vhd_source   $(SNAP_HDL_CORE)/psl_accel.vhd_source; \
 	fi
 	@if [ $(FPGACARD) = "FGT" ]; then \
-		ln -f -s $(SNAP_HDL_CORE)/psl_fpga_fgt.vhd_source  $(SNAP_HDL_CORE)/psl_fpga.vhd_source; \
-		ln -f -s $(SNAP_HDL_CORE)/psl_accel_fgt.vhd_source $(SNAP_HDL_CORE)/psl_accel.vhd_source; \
+		ln -f -s $(SNAP_HDL_CORE)/psl_fpga_fgt.vhd_source    $(SNAP_HDL_CORE)/psl_fpga.vhd_source; \
+		ln -f -s $(SNAP_HDL_CORE)/psl_accel_fgt.vhd_source   $(SNAP_HDL_CORE)/psl_accel.vhd_source; \
 	fi
 	@echo -e "\t[PREPARE ENV.........] done `date`";
 
@@ -200,14 +200,26 @@ image: snap_config patch_version
 	@$(RM) -r .bitstream_name.txt
 	@echo -e "\t[BUILD IMAGE.........] done  `date`"
 
-cloud_image: snap_config patch_version
+snap_static_region: snap_config patch_version
 	@if [ `echo "$(USE_PRFLOW)" | tr a-z A-Z` != "TRUE" ]; then \
 		echo -e "\tMakefile target $@ is only allowed for PR flow!"; exit -1; \
 	fi
-	@echo -e "\t[BUILD CLOUD IMAGE...] start `date`"
-	@cd $(BUILD_DIR) && vivado -quiet -mode batch -source snap_cloud_build.tcl -notrace -log $(LOGS_DIR)/snap_cloud_build.log -journal $(LOGS_DIR)/snap_cloud_build.jou
+	@echo -e "\t[SNAP STATIC REGION..] Creating black boxed DCP: start `date`"
+	@cd $(BUILD_DIR) && vivado -quiet -mode batch -source snap_static_region.tcl -notrace -log $(LOGS_DIR)/snap_static_region.log -journal $(LOGS_DIR)/snap_static_region.jou
 	@rm -r -f .bitstream_name.txt
-	@echo -e "\t[BUILD CLOUD IMAGE...] done  `date`"
+	@echo -e "\t[SNAP STATIC REGION..] done  `date`"
+
+combine_dcps: setup_environment
+	@echo -e "\t[COMBINING DCPS......] start `date`";
+	@if [ ! -d "$(DCP_ROOT)" ]; then \
+		echo "Missing path to DCP checkpoints"; \
+		echo "Please check the following variable before calling make!"; \
+		echo "DCP_ROOT:       $(DCP_ROOT)"; \
+		exit 1; \
+	fi
+	@echo -e "\t                        using `vivado -version |grep Vivado`"
+	@cd $(SNAP_HARDWARE_ROOT)/setup                                    && vivado -quiet -mode batch -source combine_dcps.tcl -notrace -log $(LOGS_DIR)/combine_dcps.log  -journal $(LOGS_DIR)/combine_dcps.jou
+	@echo -e "\t[COMBINING DCPS......] done `date`"
 
 model: action_sw snap_config patch_version $(SIMULATOR)
 
