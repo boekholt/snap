@@ -49,7 +49,7 @@ endif
 
 export NVME_USED ?= FALSE
 
-export PR_CONFIG ?= FALSE
+export USE_PRFLOW ?= FALSE
 
 ## variables just for this Makefile
 BUILD_DIR=$(SNAP_HARDWARE_ROOT)/build
@@ -75,7 +75,7 @@ SNAP_TMP_FILES =  $(SNAP_HARDWARE_ROOT)/sim/README.txt \
 #      due to missing dependencies between the different targets.
 #
 
-.PHONY: all clean gitclean check_snap_settings image model action_hw action_sw software pslse setup_environment create_environment config patch_version cloud_image snap_config snap_config_start
+.PHONY: all clean gitclean check_snap_settings check_denali model action_hw action_sw software pslse setup_environment create_environment config patch_version patch_NVMe image cloud_image snap_config snap_config_start xsim irun questa
 
 all: config model image
 
@@ -126,8 +126,6 @@ check_denali:
 			exit 1; \
 		fi \
 	fi
-
-
 
 setup_environment:
 	@echo -e "\t[PREPARE ENV.........] start `date`";
@@ -194,8 +192,8 @@ patch_NVMe:
 	fi
 
 image: snap_config patch_version
-	@if [ `echo "$(PR_CONFIG)" | tr a-z A-Z` = "TRUE" ]; then \
-		echo -e "\tTarget image not allowed for PR configuration!"; exit -1; \
+	@if [ `echo "$(USE_PRFLOW)" | tr a-z A-Z` = "TRUE" ]; then \
+		echo -e "\tMakefile target $@ not allowed for PR flow!"; exit -1; \
 	fi
 	@echo -e "\t[BUILD IMAGE.........] start `date`"
 	@cd $(BUILD_DIR) && vivado -quiet -mode batch -source snap_build.tcl -notrace -log $(LOGS_DIR)/snap_build.log -journal $(LOGS_DIR)/snap_build.jou
@@ -203,8 +201,8 @@ image: snap_config patch_version
 	@echo -e "\t[BUILD IMAGE.........] done  `date`"
 
 cloud_image: snap_config patch_version
-	@if [ `echo "$(PR_CONFIG)" | tr a-z A-Z` != "TRUE" ]; then \
-		echo -e "\tTarget cloud_image is only allowed for PR configuration!"; exit -1; \
+	@if [ `echo "$(USE_PRFLOW)" | tr a-z A-Z` != "TRUE" ]; then \
+		echo -e "\tMakefile target $@ is only allowed for PR flow!"; exit -1; \
 	fi
 	@echo -e "\t[BUILD CLOUD IMAGE...] start `date`"
 	@cd $(BUILD_DIR) && vivado -quiet -mode batch -source snap_cloud_build.tcl -notrace -log $(LOGS_DIR)/snap_cloud_build.log -journal $(LOGS_DIR)/snap_cloud_build.jou
