@@ -75,7 +75,7 @@ SNAP_TMP_FILES =  $(SNAP_HARDWARE_ROOT)/sim/README.txt \
 #      due to missing dependencies between the different targets.
 #
 
-.PHONY: all clean gitclean check_snap_settings check_denali model action_hw action_sw software pslse setup_environment create_environment config patch_version patch_NVMe image snap_static_region combine_dcps snap_config snap_config_start xsim irun questa
+.PHONY: all clean gitclean check_snap_settings check_denali model action_hw action_sw software pslse prepare_environment create_environment config patch_version patch_NVMe image snap_static_region user_action combine_dcps snap_config snap_config_start xsim irun questa
 
 all: config model image
 
@@ -127,8 +127,8 @@ check_denali:
 		fi \
 	fi
 
-setup_environment:
-	@echo -e "\t[PREPARE ENV.........] start `date`";
+prepare_environment:
+	@echo -e "\t[PREPARE ENVIRONMENT.]";
 	@mkdir -p $(BUILD_DIR);
 	@mkdir -p $(BUILD_DIR)/Reports;
 	@mkdir -p $(LOGS_DIR);
@@ -136,6 +136,8 @@ setup_environment:
 	@mkdir -p $(BUILD_DIR)/Checkpoints;
 	@ln -f -s $(SNAP_HARDWARE_ROOT)/setup/snap_build.tcl         $(BUILD_DIR)/snap_build.tcl;
 	@ln -f -s $(SNAP_HARDWARE_ROOT)/setup/snap_static_region.tcl $(BUILD_DIR)/snap_static_region.tcl;
+	@ln -f -s $(SNAP_HARDWARE_ROOT)/setup/user_action.tcl        $(BUILD_DIR)/user_action.tcl;
+	@ln -f -s $(SNAP_HARDWARE_ROOT)/setup/combine_dcps.tcl       $(BUILD_DIR)/combine_dcps.tcl;
 	@cp -p $(PSL_DCP)                                            $(BUILD_DIR)/Checkpoints/;
 	@if [ $(FPGACARD) = "KU3" ]; then \
 		ln -f -s $(SNAP_HDL_CORE)/psl_fpga_ku3.vhd_source    $(SNAP_HDL_CORE)/psl_fpga.vhd_source; \
@@ -145,7 +147,7 @@ setup_environment:
 		ln -f -s $(SNAP_HDL_CORE)/psl_fpga_fgt.vhd_source    $(SNAP_HDL_CORE)/psl_fpga.vhd_source; \
 		ln -f -s $(SNAP_HDL_CORE)/psl_accel_fgt.vhd_source   $(SNAP_HDL_CORE)/psl_accel.vhd_source; \
 	fi
-	@echo -e "\t[PREPARE ENV.........] done `date`";
+	@echo -e "\t[PREPARE ENVIRONMENT.] done `date`";
 
 %.vhd: %.vhd_source
 	@$(SNAP_HARDWARE_ROOT)/setup/snap_config.sh $@_source $@
@@ -178,7 +180,7 @@ create_environment:
 config_start:
 	@echo -e "\t[CONFIG..............] start `date`"
 
-config: config_start check_snap_settings setup_environment snap_config action_hw create_environment patch_version patch_NVMe
+config: config_start check_snap_settings prepare_environment snap_config action_hw create_environment patch_version patch_NVMe
 	@echo -e "\t[CONFIG..............] done `date`"
 
 patch_version:
@@ -209,7 +211,19 @@ snap_static_region: snap_config patch_version
 	@rm -r -f .bitstream_name.txt
 	@echo -e "\t[SNAP STATIC REGION..] done  `date`"
 
-combine_dcps: setup_environment
+user_action: check_snap_settings prepare_environment snap_config action_hw patch_version
+	@if [ `echo "$(USE_PRFLOW)" | tr a-z A-Z` != "TRUE" ]; then \
+		echo -e "\tMakefile target $@ is only allowed for PR flow!"; exit -1; \
+	fi
+	@echo -e "\t[USER ACTION.........] Creating user action DCP: start `date`"
+	@echo -e "\t                        using `vivado -version |grep Vivado`"
+	@cd $(SNAP_HARDWARE_ROOT)/setup                                    && vivado -quiet -mode batch -source create_ip.tcl        -notrace -log $(LOGS_DIR)/create_ip.log         -journal $(LOGS_DIR)/create_ip.jou
+	@if [ $(NVME_USED) = "TRUE" ]; then cd $(SNAP_HARDWARE_ROOT)/setup && vivado -quiet -mode batch -source create_nvme_host.tcl -notrace -log $(LOGS_DIR)/create_nvme_host.log  -journal $(LOGS_DIR)/create_nvme_host.jou; fi
+	@cd $(BUILD_DIR) && vivado -quiet -mode batch -source user_action.tcl -notrace -log $(LOGS_DIR)/user_action.log -journal $(LOGS_DIR)/user_action.jou
+	@rm -r -f .bitstream_name.txt
+	@echo -e "\t[USER ACTION.........] done  `date`"
+
+combine_dcps: prepare_environment
 	@echo -e "\t[COMBINING DCPS......] start `date`";
 	@if [ ! -d "$(DCP_ROOT)" ]; then \
 		echo "Missing path to DCP checkpoints"; \
@@ -218,7 +232,7 @@ combine_dcps: setup_environment
 		exit 1; \
 	fi
 	@echo -e "\t                        using `vivado -version |grep Vivado`"
-	@cd $(SNAP_HARDWARE_ROOT)/setup                                    && vivado -quiet -mode batch -source combine_dcps.tcl -notrace -log $(LOGS_DIR)/combine_dcps.log  -journal $(LOGS_DIR)/combine_dcps.jou
+	@cd $(BUILD_DIR) && vivado -quiet -mode batch -source combine_dcps.tcl -notrace -log $(LOGS_DIR)/combine_dcps.log  -journal $(LOGS_DIR)/combine_dcps.jou
 	@echo -e "\t[COMBINING DCPS......] done `date`"
 
 model: action_sw snap_config patch_version $(SIMULATOR)
