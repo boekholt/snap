@@ -136,6 +136,7 @@ prepare_environment:
 	@mkdir -p $(BUILD_DIR)/Checkpoints;
 	@ln -f -s $(SNAP_HARDWARE_ROOT)/setup/snap_build.tcl         $(BUILD_DIR)/snap_build.tcl;
 	@ln -f -s $(SNAP_HARDWARE_ROOT)/setup/snap_static_region.tcl $(BUILD_DIR)/snap_static_region.tcl;
+	@ln -f -s $(SNAP_HARDWARE_ROOT)/setup/user_action_synth.tcl  $(BUILD_DIR)/user_action_synth.tcl;
 	@ln -f -s $(SNAP_HARDWARE_ROOT)/setup/user_action.tcl        $(BUILD_DIR)/user_action.tcl;
 	@ln -f -s $(SNAP_HARDWARE_ROOT)/setup/combine_dcps.tcl       $(BUILD_DIR)/combine_dcps.tcl;
 	@cp -p $(PSL_DCP)                                            $(BUILD_DIR)/Checkpoints/;
@@ -210,6 +211,15 @@ snap_static_region: snap_config patch_version
 	@cd $(BUILD_DIR) && vivado -quiet -mode batch -source snap_static_region.tcl -notrace -log $(LOGS_DIR)/snap_static_region.log -journal $(LOGS_DIR)/snap_static_region.jou
 	@rm -r -f .bitstream_name.txt
 	@echo -e "\t[SNAP STATIC REGION..] done  `date`"
+
+user_action_synth: snap_config action_hw patch_version
+	@if [ `echo "$(USE_PRFLOW)" | tr a-z A-Z` != "TRUE" ]; then \
+		echo -e "\tMakefile target $@ is only allowed for PR flow!"; exit -1; \
+	fi
+	@echo -e "\t[USER ACTION SYNTH...] start `date`"
+	@echo -e "\t                        using `vivado -version |grep Vivado`"
+	@cd $(BUILD_DIR) && vivado -quiet -mode batch -source user_action_synth.tcl -notrace -log $(LOGS_DIR)/user_action_synth.log -journal $(LOGS_DIR)/user_action_synth.jou
+	@echo -e "\t[USER ACTION SYNTH...] done  `date`"
 
 user_action: check_snap_settings prepare_environment snap_config action_hw patch_version
 	@if [ `echo "$(USE_PRFLOW)" | tr a-z A-Z` != "TRUE" ]; then \
