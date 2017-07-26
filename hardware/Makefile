@@ -128,7 +128,7 @@ check_denali:
 	fi
 
 prepare_environment:
-	@echo -e "\t[PREPARE ENVIRONMENT.]";
+	@echo -e "\t[PREPARE ENVIRONMENT.] start `date`";
 	@mkdir -p $(BUILD_DIR);
 	@mkdir -p $(BUILD_DIR)/Reports;
 	@mkdir -p $(LOGS_DIR);
@@ -167,6 +167,9 @@ action_hw:
 	@$(MAKE) -C $(ACTION_ROOT) hw > $(LOGS_DIR)/action_make.log;
 	@if [ $$? -ne 0 ]; then \
 		echo -e "\t                        Error: please look into $(LOGS_DIR)/action_make.log"; exit -1; \
+	fi
+	@if [ $(USE_PRFLOW) = "TRUE" ]; then \
+		$(MAKE) -kC $(ACTION_ROOT)/hw vhdl; \
 	fi
 	@echo -e "\t[CONFIG ACTION HW....] done `date`";
 

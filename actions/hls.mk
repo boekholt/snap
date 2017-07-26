@@ -26,6 +26,7 @@ PART_NUMBER ?= $(FPGACHIP)
 WRAPPER ?= hls_action
 
 syn_dir=$(SOLUTION_DIR)_$(PART_NUMBER)/$(SOLUTION_NAME)/syn
+symlinks=vhdl report
 
 # gcc test-bench stuff
 objs = $(srcs:.cpp=.o)
@@ -37,6 +38,10 @@ all: $(syn_dir) check
 $(syn_dir): $(srcs) run_hls_script.tcl
 	vivado_hls -f run_hls_script.tcl
 	$(RM) -rf $@/systemc $@/verilog
+
+# Create symlinks for simpler access
+$(symlinks): $(syn_dir)
+	@ln -sf $(syn_dir)/$@ $@
 
 run_hls_script.tcl: ../../scripts/create_run_hls_script.sh
 	../../scripts/create_run_hls_script.sh	\

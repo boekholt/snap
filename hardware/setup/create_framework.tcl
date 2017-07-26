@@ -48,6 +48,10 @@ if { [info exists ::env(USE_PRFLOW)] == 1 } {
   set use_prflow "FALSE"
 }
 
+if { ( $use_prflow == "TRUE" ) && ( $hls_support == "TRUE" ) } {
+  set action_dir $::env(ACTION_ROOT)/hw/vhdl
+}
+
 if { [info exists ::env(DENALI)] == 1 } {
   set denali_dir  $::env(DENALI)
 } else {
